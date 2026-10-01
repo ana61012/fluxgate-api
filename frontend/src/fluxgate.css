@@ -123,3 +123,21 @@ body { margin: 0; background: var(--ink); color: var(--text); font-family: 'Spac
 .code, .json { margin: 0; padding: 14px; background: #050810; border: 1px solid var(--line); border-radius: 10px; font-size: 12.5px; line-height: 1.6; overflow-x: auto; white-space: pre; animation: keyIn .5s; }
 .code { color: #b9c8ff; min-height: 150px; }
 .json { margin-top: 12px; color: var(--cyan); animation: lineIn .35s ease-out; }
+
+/* ---------- landing page ---------- */
+.lp { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 96px 20px 48px; overflow: hidden; text-align: center; background: #07041a; }
+/* sepia + hue-rotate turns the grey brick image purple; the animation underneath is untouched */
+.lp-bg { position: absolute; inset: 0; overflow: hidden; filter: sepia(1) hue-rotate(228deg) saturate(2.4) brightness(.95); }
+.lp-veil { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 38%, rgba(139,92,246,.28), transparent 62%), linear-gradient(180deg, rgba(6,9,19,.55), rgba(6,9,19,.15) 40%, rgba(6,9,19,.85)); }
+.lp-nav { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; justify-content: space-between; align-items: center; padding: 24px 28px; }
+.lp-hero { position: relative; z-index: 2; max-width: 760px; }
+.lp-hero > * { animation: lpIn .8s cubic-bezier(.2,.8,.2,1) both; }
+.lp-hero > :nth-child(2) { animation-delay: .12s; } .lp-hero > :nth-child(3) { animation-delay: .24s; }
+.lp-hero > :nth-child(4) { animation-delay: .36s; } .lp-hero > :nth-child(5) { animation-delay: .48s; }
+@keyframes lpIn { from { opacity: 0; transform: translateY(18px); } }
+.lp-title { font-family: 'Black Ops One', 'Space Grotesk', sans-serif; font-size: clamp(56px, 11vw, 132px); line-height: 1; margin: 0 0 20px; letter-spacing: .03em; background: linear-gradient(90deg, #fff, #c4b5fd, #37e1ff, #fff); background-size: 250%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 6s linear infinite; filter: drop-shadow(0 0 28px rgba(139,92,246,.55)); }
+.lp-hero p { margin: 0 auto 30px; max-width: 560px; font-size: 19px; line-height: 1.55; color: #cfd8ff; }
+.lp-cta { padding: 16px 42px; font-size: 18px; background: linear-gradient(90deg, #a78bfa, #37e1ff); }
+.lp-lane { margin: 40px auto 0; width: min(460px, 86vw); border-color: rgba(167,139,250,.35); }
+.chips { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; list-style: none; padding: 0; margin: 28px 0 0; }
+.chips li { padding: 6px 14px; border: 1px solid rgba(139,92,246,.5); border-radius: 999px; background: rgba(12,18,34,.55); backdrop-filter: blur(6px); font-size: 13px; color: #b9c4ec; }
