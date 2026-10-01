@@ -35,20 +35,24 @@ function Backdrop() {
 
 function Landing({ onStart }) {
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center p-4 overflow-hidden">
-      <ShinyEdgeBackground imageSrc={bgImage} />
-      <nav className="absolute top-0 w-full p-6 flex justify-between items-center z-20 max-w-6xl mx-auto">
-        <div className="text-2xl font-bold text-white" style={{ fontFamily: 'Black Ops One' }}>FluxGate</div>
-        <button onClick={onStart} className="px-6 py-2 rounded-full border border-white/30 text-white hover:bg-white/10 transition-colors font-semibold backdrop-blur-md">Sign In</button>
+    <div className="lp">
+      {/* your brick animation, tinted purple with CSS so the component stays untouched */}
+      <div className="lp-bg"><ShinyEdgeBackground imageSrc={bgImage} /></div>
+      <div className="lp-veil" />
+      <nav className="lp-nav">
+        <Brand />
+        <button className="btn ghost" onClick={onStart}>Sign in</button>
       </nav>
-      <div className="relative z-10 max-w-4xl w-full text-center space-y-8 flex flex-col items-center mt-[-10vh]">
-        <h1 className="text-white text-7xl md:text-9xl font-bold drop-shadow-2xl tracking-wider" style={{ fontFamily: 'Black Ops One' }}>FluxGate</h1>
-        <p className="text-white/90 text-xl md:text-2xl font-medium max-w-2xl mx-auto drop-shadow-md">
-          The Enterprise API Gateway. Secure your endpoints, manage developer access, and prevent abuse with real-time rate limiting.
-        </p>
-        <button onClick={onStart} className="mt-8 px-12 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:scale-110 transition-all duration-300 hover:shadow-[0_0_40px_rgba(6,182,212,0.6)] text-white rounded-full font-bold text-xl border border-white/20">
-          Get Started
-        </button>
+      <div className="lp-hero">
+        <h1 className="lp-title">FluxGate</h1>
+        <p>The enterprise API gateway. Secure your endpoints, manage developer access, and stop abuse with real-time rate limiting.</p>
+        <button className="btn lp-cta" onClick={onStart}>Get started</button>
+        <div className="lane lp-lane" aria-hidden="true">
+          <div className="gate" /><div className="pkt" /><div className="pkt" /><div className="pkt" /><div className="pkt" />
+        </div>
+        <ul className="chips">
+          <li>Redis token bucket</li><li>bcrypt-hashed keys</li><li>JWT sessions</li>
+        </ul>
       </div>
     </div>
   )
