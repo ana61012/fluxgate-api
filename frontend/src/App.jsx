@@ -95,8 +95,8 @@ function Auth({ onLogin }) {
       <form className="card" onSubmit={submit}>
         <h3>{mode === 'login' ? 'Log in' : 'Create account'}</h3>
         <p className="sub">{mode === 'login' ? 'Welcome back, developer.' : 'Free, takes ten seconds.'}</p>
-        <input className="field" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input className="field" type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <input className="field" type="email" placeholder="test@best.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <input className="field" type="password" placeholder="1234" value={password} onChange={(e) => setPassword(e.target.value)} required />
         {msg.text && <p className={`err ${msg.good ? 'good' : ''}`} key={msg.text}>{msg.text}</p>}
         <div className="row">
           <button className="btn" disabled={loading}>{loading ? 'Working…' : mode === 'login' ? 'Log in' : 'Sign up'}</button>
