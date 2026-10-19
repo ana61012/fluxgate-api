@@ -1,3 +1,4 @@
+![CI](https://github.com/ana61012/fluxgate-api/actions/workflows/ci.yml/badge.svg)
 # 🚀 FluxGate: SaaS API Gateway with Redis Rate Limiting
 
 FluxGate is a full-stack, cloud-deployed API gateway. It sits in front of a protected endpoint, handles developer sign-up and login, issues securely hashed API keys, and enforces real-time rate limits using a **Token Bucket algorithm running atomically inside Redis (Lua script)**.
