@@ -59,12 +59,3 @@ def test_rate_limiter_exceeded():
         # The 6th request should be blocked (429 Too Many Requests)
         blocked_res = client.get("/secure-data", headers=headers)
         assert blocked_res.status_code == 429
-    
-    # Make 5 successful requests
-    for _ in range(5):
-        res = client.get("/secure-data", headers=headers)
-        assert res.status_code == 200
-        
-    # The 6th request should be blocked (429 Too Many Requests)
-    blocked_res = client.get("/secure-data", headers=headers)
-    assert blocked_res.status_code == 429
