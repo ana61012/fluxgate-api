@@ -12,6 +12,9 @@ from rate_limiter import check_rate_limit
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+@app.get("/")
+def read_root():
+    return {"status": "ok"}
 
 app.add_middleware(
     CORSMiddleware,
