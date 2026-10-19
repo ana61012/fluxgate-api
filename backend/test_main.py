@@ -34,20 +34,31 @@ def test_rate_limiter_exceeded():
     email = "ratelimit@example.com"
     password = "securepassword"
     
-    # 1. Register and Login
-    client.post(f"/signup?email={email}&password={password}")
-    login_response = client.post("/login", data={"username": email, "password": password})
-    token = login_response.json()["access_token"]
-    
-    # 2. Generate a valid API key
-    gen_response = client.post(
-        "/generate-key", 
-        headers={"Authorization": f"Bearer {token}"}
-    )
-    valid_key = gen_response.json()["api_key"]
-    
-    # 3. Hit the secure endpoint to test rate limiting
-    headers = {"x-api-key": valid_key}
+    # Using TestClient as a context manager keeps the event loop open
+    with TestClient(app) as client:
+        # 1. Register and Login
+        client.post(f"/signup?email={email}&password={password}")
+        login_response = client.post("/login", data={"username": email, "password": password})
+        token = login_response.json()["access_token"]
+        
+        # 2. Generate a valid API key
+        gen_response = client.post(
+            "/generate-key", 
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        valid_key = gen_response.json()["api_key"]
+        
+        # 3. Hit the secure endpoint to test rate limiting
+        headers = {"x-api-key": valid_key}
+        
+        # Make 5 successful requests
+        for _ in range(5):
+            res = client.get("/secure-data", headers=headers)
+            assert res.status_code == 200
+            
+        # The 6th request should be blocked (429 Too Many Requests)
+        blocked_res = client.get("/secure-data", headers=headers)
+        assert blocked_res.status_code == 429
     
     # Make 5 successful requests
     for _ in range(5):
