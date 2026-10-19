@@ -47,3 +47,10 @@ jobs:
       - name: Run tests
         working-directory: ./backend
         run: pytest -q
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        run: curl -fsS "${{ secrets.RENDER_DEPLOY_HOOK }}"      
