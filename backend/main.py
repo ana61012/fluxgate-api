@@ -7,23 +7,27 @@ import secrets
 import models
 from database import engine, get_db
 from auth import get_password_hash, verify_password, create_access_token
-from rate_limiter import check_rate_limit, redis_client
-from redis.exceptions import RedisError
+from rate_limiter import check_rate_limit
 from starlette.concurrency import run_in_threadpool
 import hashlib
 
 models.Base.metadata.create_all(bind=engine)
 
-AUTH_CACHE_TTL = 300      # seconds a verified key stays cached
-INVALID_CACHE_TTL = 60    # seconds a bad key is remembered (blocks bcrypt spam)
+def hash_api_key(raw_key: str) -> str:
+    """API keys are 256-bit random strings, so a fast SHA-256 is enough.
+    bcrypt is meant for low-entropy passwords; for keys it only made every
+    request take seconds on a small CPU."""
+    return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
 
 
 def _find_key_limit(db: Session, raw_key: str):
-    """Blocking bcrypt scan. Returns the key's rate limit, or None if invalid."""
-    for record in db.query(models.ApiKey).all():
-        if verify_password(raw_key, record.hashed_key):
-            return record.rate_limit
-    return None
+    """Indexed lookup by hash. Returns the key's rate limit, or None if invalid."""
+    record = (
+        db.query(models.ApiKey)
+        .filter(models.ApiKey.hashed_key == hash_api_key(raw_key))
+        .first()
+    )
+    return record.rate_limit if record else None
 
 app = FastAPI()
 @app.get("/")
@@ -40,7 +44,7 @@ app.add_middleware(
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-# --- AUTHENTICATION ROUTES ---
+
 
 @app.post("/signup")
 def signup(email: str, password: str, db: Session = Depends(get_db)):
@@ -68,7 +72,6 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 
-# --- SAAS DASHBOARD ROUTES ---
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     from auth import SECRET_KEY, ALGORITHM
@@ -89,48 +92,25 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 @app.post("/generate-key")
 def generate_key(current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     raw_api_key = secrets.token_urlsafe(32)
-    hashed_key = get_password_hash(raw_api_key)
-    
+    hashed_key = hash_api_key(raw_api_key)
+
     new_key = models.ApiKey(hashed_key=hashed_key, owner_id=current_user.id)
     db.add(new_key)
     db.commit()
     
     return {"api_key": raw_api_key, "rate_limit": 5}
 
-# --- PROTECTED API ROUTE ---
+
 
 @app.get("/secure-data")
 async def get_secure_data(x_api_key: str = Header(None), db: Session = Depends(get_db)):
     if not x_api_key:
         raise HTTPException(status_code=401, detail="Missing x-api-key in headers")
         
-    # Fast path: a recent successful (or failed) bcrypt check is cached in Redis,
-    # keyed by a SHA-256 of the key so the raw key is never stored.
-    cache_key = "auth:" + hashlib.sha256(x_api_key.encode("utf-8")).hexdigest()
-    cached = None
-    try:
-        cached = await redis_client.get(cache_key)
-    except RedisError:
-        pass  # cache is optional; fall through to the DB check
-
-    if cached == "invalid":
+ 
+    limit = await run_in_threadpool(_find_key_limit, db, x_api_key)
+    if limit is None:
         raise HTTPException(status_code=401, detail="Invalid API Key")
-
-    if cached is not None:
-        limit = int(cached)
-    else:
-        # Slow path: bcrypt is CPU-bound, so run it off the event loop.
-        limit = await run_in_threadpool(_find_key_limit, db, x_api_key)
-        try:
-            await redis_client.set(
-                cache_key,
-                "invalid" if limit is None else limit,
-                ex=INVALID_CACHE_TTL if limit is None else AUTH_CACHE_TTL,
-            )
-        except RedisError:
-            pass
-        if limit is None:
-            raise HTTPException(status_code=401, detail="Invalid API Key")
 
     remaining = await check_rate_limit(x_api_key, limit)
     
