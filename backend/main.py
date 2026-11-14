@@ -7,9 +7,23 @@ import secrets
 import models
 from database import engine, get_db
 from auth import get_password_hash, verify_password, create_access_token
-from rate_limiter import check_rate_limit
+from rate_limiter import check_rate_limit, redis_client
+from redis.exceptions import RedisError
+from starlette.concurrency import run_in_threadpool
+import hashlib
 
 models.Base.metadata.create_all(bind=engine)
+
+AUTH_CACHE_TTL = 300      # seconds a verified key stays cached
+INVALID_CACHE_TTL = 60    # seconds a bad key is remembered (blocks bcrypt spam)
+
+
+def _find_key_limit(db: Session, raw_key: str):
+    """Blocking bcrypt scan. Returns the key's rate limit, or None if invalid."""
+    for record in db.query(models.ApiKey).all():
+        if verify_password(raw_key, record.hashed_key):
+            return record.rate_limit
+    return None
 
 app = FastAPI()
 @app.get("/")
@@ -90,18 +104,35 @@ async def get_secure_data(x_api_key: str = Header(None), db: Session = Depends(g
     if not x_api_key:
         raise HTTPException(status_code=401, detail="Missing x-api-key in headers")
         
-    all_keys = db.query(models.ApiKey).all()
-    valid_key_record = None
-    
-    for key_record in all_keys:
-        if verify_password(x_api_key, key_record.hashed_key):
-            valid_key_record = key_record
-            break
-            
-    if not valid_key_record:
+    # Fast path: a recent successful (or failed) bcrypt check is cached in Redis,
+    # keyed by a SHA-256 of the key so the raw key is never stored.
+    cache_key = "auth:" + hashlib.sha256(x_api_key.encode("utf-8")).hexdigest()
+    cached = None
+    try:
+        cached = await redis_client.get(cache_key)
+    except RedisError:
+        pass  # cache is optional; fall through to the DB check
+
+    if cached == "invalid":
         raise HTTPException(status_code=401, detail="Invalid API Key")
-        
-    remaining = await check_rate_limit(x_api_key, valid_key_record.rate_limit)
+
+    if cached is not None:
+        limit = int(cached)
+    else:
+        # Slow path: bcrypt is CPU-bound, so run it off the event loop.
+        limit = await run_in_threadpool(_find_key_limit, db, x_api_key)
+        try:
+            await redis_client.set(
+                cache_key,
+                "invalid" if limit is None else limit,
+                ex=INVALID_CACHE_TTL if limit is None else AUTH_CACHE_TTL,
+            )
+        except RedisError:
+            pass
+        if limit is None:
+            raise HTTPException(status_code=401, detail="Invalid API Key")
+
+    remaining = await check_rate_limit(x_api_key, limit)
     
     return {
         "message": "Authentication and Rate Limiting Successful!",
