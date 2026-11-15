@@ -14,14 +14,11 @@ import hashlib
 models.Base.metadata.create_all(bind=engine)
 
 def hash_api_key(raw_key: str) -> str:
-    """API keys are 256-bit random strings, so a fast SHA-256 is enough.
-    bcrypt is meant for low-entropy passwords; for keys it only made every
-    request take seconds on a small CPU."""
-    return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+ return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
 
 
 def _find_key_limit(db: Session, raw_key: str):
-    """Indexed lookup by hash. Returns the key's rate limit, or None if invalid."""
+   
     record = (
         db.query(models.ApiKey)
         .filter(models.ApiKey.hashed_key == hash_api_key(raw_key))
