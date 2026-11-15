@@ -123,7 +123,6 @@ function Dashboard({ token, email, onLogout }) {
   const shown = useScramble(apiKey)
   const termRef = useRef(null)
 
- 
   useEffect(() => {
     const id = setInterval(() => setRemaining((r) => Math.min(max, r + 1)), 60000 / max)
     return () => clearInterval(id)
@@ -132,16 +131,15 @@ function Dashboard({ token, email, onLogout }) {
 
   useEffect(() => {
     if (!revealed) return
-    const id = setTimeout(() => setRevealed(false), 30000)
+    const id = setTimeout(() => setRevealed(false), 5000)
     return () => clearTimeout(id)
-  }, [revealed])
+  }, [revealed, apiKey])
 
   const push = (status, msg) => setLog((l) => [...l.slice(-40), { id: crypto.randomUUID(), status, msg, t: new Date().toLocaleTimeString() }])
 
   const mint = async () => {
     try {
       const res = await axios.post(`${API}/generate-key`, {}, { headers: { Authorization: `Bearer ${token}` } })
-     
       setApiKey(res.data.api_key); setRevealed(true)
       setMax(res.data.rate_limit); setRemaining(res.data.rate_limit); setCopied(false)
     } catch (err) { push(0, err.response?.data?.detail || 'Could not create a key. Try logging in again.') }
@@ -173,7 +171,6 @@ function Dashboard({ token, email, onLogout }) {
     setBusy(false)
   }
 
- 
   const k = revealed && apiKey ? apiKey : 'YOUR_API_KEY'
   const snippets = {
     curl: `curl -X GET ${API}/secure-data \\\n  -H "x-api-key: ${k}"`,
@@ -191,13 +188,13 @@ function Dashboard({ token, email, onLogout }) {
       <div className="grid2">
         <div className="card">
           <h3>Your API key</h3>
-          <p className="sub">Copy it now. It hides itself after 30 seconds and the server never shows it again.</p>
+          <p className="sub">Copy it now. It hides itself after 5 seconds and the server never shows it again.</p>
           <div className="keybox mono" key={apiKey}>
             {!apiKey ? 'No key yet. Create one to start sending requests.' : revealed ? shown : '•'.repeat(apiKey.length)}
           </div>
           <div className="row" style={{ marginTop: 14 }}>
             <button className="btn" onClick={mint}>{apiKey ? 'Replace key' : 'Create key'}</button>
-            <button className="btn ghost" onClick={() => setRevealed((r) => !r)} disabled={!apiKey}>{revealed ? 'Hide' : 'Show'}</button>
+            <button className="btn ghost" onClick={() => setRevealed(true)} disabled={!apiKey || revealed}>Show</button>
             <button className="btn ghost" onClick={copy} disabled={!apiKey}>{copied ? 'Copied' : 'Copy key'}</button>
           </div>
           <p className="note">Creating a new key does not delete the old one. Send it as the <span className="mono">x-api-key</span> header.</p>
