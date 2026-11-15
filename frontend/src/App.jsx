@@ -70,11 +70,11 @@ function Auth({ onLogin }) {
     setLoading(true); setMsg({ text: '', good: false })
     try {
       if (mode === 'signup') {
-        await axios.post(`${API}/signup`, null, { params: { email, password } })
+        await axios.post(`${API}/signup`, { email, password }, { timeout: 60000 })
         setMode('login'); setMsg({ text: 'Account created. Log in to continue.', good: true })
       } else {
         const body = new URLSearchParams({ username: email, password })
-        const res = await axios.post(`${API}/login`, body)
+        const res = await axios.post(`${API}/login`, body, { timeout: 60000 })
         onLogin(res.data.access_token, email)
       }
     } catch (err) {
@@ -96,7 +96,7 @@ function Auth({ onLogin }) {
         <h3>{mode === 'login' ? 'Log in' : 'Create account'}</h3>
         <p className="sub">{mode === 'login' ? 'Welcome back, developer.' : 'Free, takes ten seconds.'}</p>
         <input className="field" type="email" placeholder="test@best.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input className="field" type="password" placeholder="1234" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <input className="field" type="password" placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} required />
         {msg.text && <p className={`err ${msg.good ? 'good' : ''}`} key={msg.text}>{msg.text}</p>}
         <div className="row">
           <button className="btn" disabled={loading}>{loading ? 'Working…' : mode === 'login' ? 'Log in' : 'Sign up'}</button>
@@ -113,6 +113,7 @@ function Dashboard({ token, email, onLogout }) {
   const [apiKey, setApiKey] = useState('')
   const [inputKey, setInputKey] = useState('')
   const [copied, setCopied] = useState(false)
+  const [revealed, setRevealed] = useState(false)
   const [max, setMax] = useState(5)
   const [remaining, setRemaining] = useState(5)
   const [log, setLog] = useState([])
@@ -122,19 +123,26 @@ function Dashboard({ token, email, onLogout }) {
   const shown = useScramble(apiKey)
   const termRef = useRef(null)
 
-  // Visual refill between responses; every server reply re-syncs the real number
+ 
   useEffect(() => {
     const id = setInterval(() => setRemaining((r) => Math.min(max, r + 1)), 60000 / max)
     return () => clearInterval(id)
   }, [max])
   useEffect(() => { termRef.current?.scrollTo({ top: 1e9, behavior: 'smooth' }) }, [log])
 
+  useEffect(() => {
+    if (!revealed) return
+    const id = setTimeout(() => setRevealed(false), 30000)
+    return () => clearTimeout(id)
+  }, [revealed])
+
   const push = (status, msg) => setLog((l) => [...l.slice(-40), { id: crypto.randomUUID(), status, msg, t: new Date().toLocaleTimeString() }])
 
   const mint = async () => {
     try {
       const res = await axios.post(`${API}/generate-key`, {}, { headers: { Authorization: `Bearer ${token}` } })
-      setApiKey(res.data.api_key); setInputKey(res.data.api_key)
+     
+      setApiKey(res.data.api_key); setRevealed(true)
       setMax(res.data.rate_limit); setRemaining(res.data.rate_limit); setCopied(false)
     } catch (err) { push(0, err.response?.data?.detail || 'Could not create a key. Try logging in again.') }
   }
@@ -148,12 +156,13 @@ function Dashboard({ token, email, onLogout }) {
         params: { _t: Date.now() },
         headers: { 'x-api-key': inputKey, 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache', Expires: '0' },
         validateStatus: () => true,
+        timeout: 15000,
       })
       const ms = Math.round(performance.now() - t0)
       if (res.status === 200) {
         setRemaining(res.data.remaining_quota); setLastData(res.data.data)
         push(200, `Allowed, ${res.data.remaining_quota} left, ${ms}ms`)
-      } else if (res.status === 429) { setRemaining(0); push(429, 'Rate limit exceeded. Wait for the bucket to refill.') }
+      } else if (res.status === 429) { setRemaining(0); push(429, res.data?.detail || 'Rate limit exceeded. Wait for the bucket to refill.') }
       else if (res.status === 401) push(401, 'Invalid API key.')
       else push(res.status, 'Unexpected error from the server.')
     } catch { push(0, 'Network error. The backend may still be waking up.') }
@@ -164,7 +173,8 @@ function Dashboard({ token, email, onLogout }) {
     setBusy(false)
   }
 
-  const k = apiKey || 'YOUR_API_KEY'
+ 
+  const k = revealed && apiKey ? apiKey : 'YOUR_API_KEY'
   const snippets = {
     curl: `curl -X GET ${API}/secure-data \\\n  -H "x-api-key: ${k}"`,
     python: `import requests\n\nres = requests.get(\n    "${API}/secure-data",\n    headers={"x-api-key": "${k}"},\n)\nprint(res.json())`,
@@ -181,13 +191,16 @@ function Dashboard({ token, email, onLogout }) {
       <div className="grid2">
         <div className="card">
           <h3>Your API key</h3>
-          <p className="sub">Shown once. Copy it before you leave this page.</p>
-          <div className="keybox mono" key={apiKey}>{apiKey ? shown : 'No key yet. Create one to start sending requests.'}</div>
+          <p className="sub">Copy it now. It hides itself after 30 seconds and the server never shows it again.</p>
+          <div className="keybox mono" key={apiKey}>
+            {!apiKey ? 'No key yet. Create one to start sending requests.' : revealed ? shown : '•'.repeat(apiKey.length)}
+          </div>
           <div className="row" style={{ marginTop: 14 }}>
             <button className="btn" onClick={mint}>{apiKey ? 'Replace key' : 'Create key'}</button>
+            <button className="btn ghost" onClick={() => setRevealed((r) => !r)} disabled={!apiKey}>{revealed ? 'Hide' : 'Show'}</button>
             <button className="btn ghost" onClick={copy} disabled={!apiKey}>{copied ? 'Copied' : 'Copy key'}</button>
           </div>
-          <p className="note">Creating a new key replaces the old one. Send it as the <span className="mono">x-api-key</span> header.</p>
+          <p className="note">Creating a new key does not delete the old one. Send it as the <span className="mono">x-api-key</span> header.</p>
         </div>
 
         <div className="card">
@@ -197,7 +210,7 @@ function Dashboard({ token, email, onLogout }) {
             {Array.from({ length: max }, (_, i) => <div key={i} className={`cell ${i < remaining ? 'full' : ''}`} />)}
           </div>
           <div className="meter"><span><b>{remaining}</b> / {max} left</span><span>{remaining === 0 ? 'Rate limited' : 'Healthy'}</span></div>
-          <input className="field mono" style={{ marginTop: 16 }} placeholder="Paste an API key (x-api-key)" value={inputKey} onChange={(e) => setInputKey(e.target.value)} />
+          <input className="field mono" style={{ marginTop: 16 }} type="password" autoComplete="off" placeholder="Paste your API key (x-api-key)" value={inputKey} onChange={(e) => setInputKey(e.target.value)} />
           <div className="row">
             <button className="btn" onClick={fire} disabled={busy}>Send request</button>
             <button className="btn ghost" onClick={burst} disabled={busy}>Send {max + 3} at once</button>
@@ -224,7 +237,7 @@ function Dashboard({ token, email, onLogout }) {
 
         <div className="card">
           <h3>Use it in your code</h3>
-          <p className="sub">Copy a snippet. Your key is filled in once you create one.</p>
+          <p className="sub">Copy a snippet and replace YOUR_API_KEY with your key. It is only filled in while the key is shown.</p>
           <div className="tabs">
             {['curl', 'python', 'node'].map((t) => (
               <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>{t === 'node' ? 'Node.js' : t === 'curl' ? 'cURL' : 'Python'}</button>
